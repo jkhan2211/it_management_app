@@ -1,179 +1,168 @@
-"use client"
-import Image from "next/image";
-import {useState, useEffect} from 'react'
-import {firestore } from '@/firebase'
-import { Box, Modal, Typography, Stack, TextField, Button } from '@mui/material'
-import {
-  collection,
-  doc,
-  getDocs,
-  query,
-  setDoc,
-  deleteDoc,
-  getDoc,
-} from 'firebase/firestore'
+"use client"; // Ensure this is the first line in the file
 
-const style = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'white',
-  border: '2px solid #000',
-  boxShadow: 24,
-  p: 4,
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 3,
-}
+import { useState, useEffect } from 'react';
+import { firestore, storage } from '@/firebase'; // Import storage for Firebase Storage
+import { Box, Typography, Stack, Button, Container, TextField } from '@mui/material';
+import { collection, doc, getDocs, query, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage'; // Import storage functions
+import InventoryItem from './components/InventoryItem';
+import AddItemModal from './components/AddItemModal';
+import PieChartComponent from './components/PieChartComponent';
+import Navbar from './components/Navbar';
 
 export default function Home() {
-  // set state variables
-  // 3. add state management
-  const [inventory, setInventory ] = useState([])
-  const [open, useOpen ] = useState(false)
-  const [itemName, setItemName] = useState('')
-
-  // queries iventory collection in Firestore
-  // useEffect - hook ensure this runs when the component mounts 
+  const [inventory, setInventory] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const updateInventory = async () => {
-    const snapshot = query(collection(firestore, 'inventory'))
-    const docs = await getDocs(snapshot)
-    const inventoryList = []
+    const snapshot = query(collection(firestore, 'inventory'));
+    const docs = await getDocs(snapshot);
+    const inventoryList = [];
     docs.forEach((doc) => {
-      inventoryList.push({ name: doc.id, ...doc.data() })
-    })
-    setInventory(inventoryList)
-  }
-  
+      inventoryList.push({ name: doc.id, ...doc.data() });
+    });
+    setInventory(inventoryList);
+  };
+
   useEffect(() => {
-    updateInventory()
-  }, [])
+    updateInventory();
+  }, []);
 
+  const addItem = async (item, imageUrl) => {
+    const docRef = doc(collection(firestore, 'inventory'), item);
+    const docSnap = await getDoc(docRef);
 
-    // Function to add item
-    const addItem = async (item) => {
-      const docRef = doc(collection(firestore, 'inventory'), item)
-      const docSnapShpt = await getDocs(docRef)
-  
-      if(docSnapShpt.exist()) {
-        const {quantity} = docSnapShpt.data()
-        await setDoc(docRef, {quantity: quantity + 1})
-      } else {
-        await setDoc(docRef, {quantity: 1})
+    const itemData = { quantity: 1 }; // Default value for quantity
+    
+    if (!docSnap.exists()) {
+      if (imageUrl) {
+        itemData.imageUrl = imageUrl;
       }
-      
-      await updateInventory()
+      await setDoc(docRef, itemData);
+    } else {
+      const existingQuantity = (await docSnap.data()).quantity || 0;
+      await setDoc(docRef, { quantity: existingQuantity + 1 }, { merge: true });
     }
-  // Function to remove item
+    await updateInventory();
+  };
+
   const removeItem = async (item) => {
-    const docRef = doc(collection(firestore, 'inventory'), item)
-    const docSnapShpt = await getDoc(docRef)
-
-    if(docSnapShpt.exist()) {
-      const {quantity} = docSnapShpt.data()
-
-      if (quantity == 1) {
-        await deleteDoc(docRef)
+    const docRef = doc(collection(firestore, 'inventory'), item);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const { quantity, imageUrl } = docSnap.data();
+      if (quantity === 1) {
+        if (imageUrl) {
+          try {
+            const imageRef = ref(storage, imageUrl);
+            await deleteObject(imageRef);
+          } catch (error) {
+            console.error("Error deleting image from Firebase Storage:", error);
+          }
+        }
+        await deleteDoc(docRef);
       } else {
-        await setDoc(docRef, {quantity: quantity - 1})
+        await setDoc(docRef, { quantity: quantity - 1 });
       }
     }
-    await updateInventory()
-  }
+    await updateInventory();
+  };
 
+  const updateQuantity = async (name, newQuantity) => {
+    const docRef = doc(collection(firestore, 'inventory'), name);
+    await setDoc(docRef, { quantity: newQuantity }, { merge: true });
+    await updateInventory();
+  };
 
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => setOpen(false);
 
-  const handleOpen = () => useOpen(true)
-  const handleClose = () => useOpen(false)
+  const handleSearch = (e) => {
+    setSearchQuery(e.target.value);
+  };
 
+  const filteredInventory = inventory.filter((item) =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <Box
-    width="100vw"
-    height="100vh"
-    display={'flex'}
-    justifyContent={'center'}
-    flexDirection={'column'}
-    alignItems={'center'}
-    gap={2}
-  >
-    <Modal
-      open={open}
-      onClose={handleClose}
-      aria-labelledby="modal-modal-title"
-      aria-describedby="modal-modal-description"
-    >
-      <Box sx={style}>
-        <Typography id="modal-modal-title" variant="h6" component="h2">
-          Add Item
-        </Typography>
-        <Stack width="100%" direction={'row'} spacing={2}>
-          <TextField
-            id="outlined-basic"
-            label="Item"
-            variant="outlined"
-            fullWidth
-            value={itemName}
-            onChange={(e) => setItemName(e.target.value)}
-          />
+    <Box>
+      <Navbar />
+      <Container
+        sx={{
+          backgroundColor: 'rgba(255, 255, 255, 0.9)', // Slightly lighter background for contrast
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 4px 30px rgba(0, 0, 0, 0.1)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          borderRadius: 4,
+          padding: 4,
+          marginTop: 4,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+        }}
+      >
+        <AddItemModal open={open} handleClose={handleClose} addItem={addItem} />
+
+        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
           <Button
-            variant="outlined"
-            onClick={() => {
-              addItem(itemName)
-              setItemName('')
-              handleClose()
+            variant="contained"
+            onClick={handleOpen}
+            sx={{
+              padding: '8px 16px',
+              fontSize: '0.875rem',
+              margin: '20px 0',
             }}
           >
-            Add
+            Add New Item
           </Button>
-        </Stack>
-      </Box>
-    </Modal>
-    <Button variant="contained" onClick={handleOpen}>
-      Add New Item
-    </Button>
-    <Box border={'1px solid #333'}>
-      <Box
-        width="800px"
-        height="100px"
-        bgcolor={'#ADD8E6'}
-        display={'flex'}
-        justifyContent={'center'}
-        alignItems={'center'}
-      >
-        <Typography variant={'h2'} color={'#333'} textAlign={'center'}>
-          Inventory Items
-        </Typography>
-      </Box>
-      <Stack width="800px" height="300px" spacing={2} overflow={'auto'}>
-        {inventory.map(({name, quantity}) => (
-          <Box
-            key={name}
-            width="100%"
-            minHeight="150px"
-            display={'flex'}
-            justifyContent={'space-between'}
-            alignItems={'center'}
-            bgcolor={'#f0f0f0'}
-            paddingX={5}
-          >
-            <Typography variant={'h3'} color={'#333'} textAlign={'center'}>
-              {name.charAt(0).toUpperCase() + name.slice(1)}
-            </Typography>
-            <Typography variant={'h3'} color={'#333'} textAlign={'center'}>
-              Quantity: {quantity}
-            </Typography>
-            <Button variant="contained" onClick={() => removeItem(name)}>
-              Remove
-            </Button>
-          </Box>
-        ))}
-      </Stack>
-    </Box>
-  </Box>
+        </Box>
 
-  )
+        <TextField
+          label="Search Items"
+          variant="outlined"
+          fullWidth
+          value={searchQuery}
+          onChange={handleSearch}
+          sx={{ margin: '20px 0' }}
+        />
+
+        <Box
+          width="100%"
+          height="100px"
+          bgcolor={'#ADD8E6'}
+          display={'flex'}
+          justifyContent={'center'}
+          alignItems={'center'}
+          mb={2}
+        >
+          <Typography variant={'h4'} color={'#333'} textAlign={'center'}>
+            IT Inventory Items
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: '20px' }}>
+          <Box sx={{ flex: 2 }}>
+            <Stack spacing={2}>
+              {filteredInventory.map(({ name, quantity, imageUrl }) => (
+                <InventoryItem
+                  key={name}
+                  name={name}
+                  quantity={quantity}
+                  imageUrl={imageUrl}
+                  removeItem={removeItem}
+                  updateQuantity={updateQuantity}
+                />
+              ))}
+            </Stack>
+          </Box>
+
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <PieChartComponent inventory={filteredInventory} />
+          </Box>
+        </Box>
+      </Container>
+    </Box>
+  );
 }

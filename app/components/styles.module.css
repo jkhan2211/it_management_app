@@ -1,0 +1,26 @@
+.inventoryItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+  }
+  
+  .itemImage {
+    flex-shrink: 0;
+    margin-right: 16px;
+  }
+  
+  .itemName {
+    flex-grow: 1;
+    font-size: 1.25rem;
+    color: #333;
+  }
+  
+  .itemQuantity {
+    font-size: 1.25rem;
+    color: #666;
+  }
+  

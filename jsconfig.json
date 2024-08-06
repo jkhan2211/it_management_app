@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
+    "baseUrl": ".", // Base directory to resolve non-relative module names
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"] // Define path aliases here
     }
-  }
+  },
+  "exclude": ["node_modules"] // Optionally exclude directories
 }
