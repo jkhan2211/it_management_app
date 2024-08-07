@@ -46,6 +46,8 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 
 # Demo
 
-### Github Link
+### Live Link
+https://it-management-qh3ywjpmv-jkhan2211s-projects.vercel.app/
 
 ### Youtube Link
+https://www.youtube.com/watch?v=pN4qrN9HVu0
